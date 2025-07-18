@@ -1,4 +1,6 @@
 .DS_Store
-references/
-test_blocktrix
 .vscode/
+*~
+references/
+blocktrix
+test_blocktrix

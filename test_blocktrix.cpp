@@ -95,15 +95,16 @@ int main() {
 
     auto duration =
         std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Solve time: (simple serial block Thomas): " << duration.count() / 1000.0 << " ms"
-              << std::endl;
+    std::cout << "Solve time: (simple serial block Thomas): "
+              << duration.count() / 1000.0 << " ms" << std::endl;
 
     // Compute error
     double max_err = 0.0;
     for (size_t i = 0; i < x.size(); ++i) {
         max_err = std::max(max_err, std::abs(x[i] - x_true[i]));
     }
-    std::cout << "Max error: (simple serial block Thomas): " << max_err << std::endl;
+    std::cout << "Max error: (simple serial block Thomas): " << max_err
+              << std::endl;
     assert(max_err < 1e-8);
 
     // LAPACK-based solver
