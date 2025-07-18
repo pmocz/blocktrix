@@ -1,5 +1,5 @@
-#ifndef BTHOMAS_SOLVER_HPP
-#define BTHOMAS_SOLVER_HPP
+#ifndef BLOCKTRIX_SOLVER_HPP
+#define BLOCKTRIX_SOLVER_HPP
 
 #include <cstddef>
 #include <vector>
@@ -13,11 +13,11 @@ void dgetrs_(const char *trans, const int *n, const int *nrhs, const double *a,
              int *info);
 }
 
-class BThomasSolver {
+class BlocktrixSolver {
   public:
     // n_blocks: number of block rows/columns
     // block_size: size of each block (assumed square)
-    BThomasSolver(size_t n_blocks, size_t block_size);
+    BlocktrixSolver(size_t n_blocks, size_t block_size);
 
     // Set the block tridiagonal system
     // Each block is stored in a flat vector<double> in row-major order
@@ -45,4 +45,4 @@ class BThomasSolver {
     void invert_block(std::vector<double> &block);
 };
 
-#endif // BTHOMAS_SOLVER_HPP
+#endif // BLOCKTRIX_SOLVER_HPP

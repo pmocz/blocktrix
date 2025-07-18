@@ -1,4 +1,4 @@
-#include "bthomas_solver.hpp"
+#include "blocktrix_solver.hpp"
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -86,7 +86,8 @@ int main() {
                          upper_blocks, x_true, b);
 
     // Solve Ax = b with basic solver
-    BThomasSolver solver(n_blocks, block_size);
+    std::cout << "Simple serial block Thomas: " << std::endl;
+    BlocktrixSolver solver(n_blocks, block_size);
     solver.set_blocks(lower_blocks, diag_blocks, upper_blocks);
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -95,19 +96,19 @@ int main() {
 
     auto duration =
         std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Solve time: (simple serial block Thomas): "
-              << duration.count() / 1000.0 << " ms" << std::endl;
+    std::cout << "  solve time: " << duration.count() / 1000.0 << " ms"
+              << std::endl;
 
     // Compute error
     double max_err = 0.0;
     for (size_t i = 0; i < x.size(); ++i) {
         max_err = std::max(max_err, std::abs(x[i] - x_true[i]));
     }
-    std::cout << "Max error: (simple serial block Thomas): " << max_err
-              << std::endl;
+    std::cout << "  max error: " << max_err << std::endl;
     assert(max_err < 1e-8);
 
     // LAPACK-based solver
+    std::cout << "LAPACK serial block Thomas: " << std::endl;
     solver.set_blocks(lower_blocks, diag_blocks,
                       upper_blocks); // reset blocks in case they were modified
     auto start_lapack = std::chrono::high_resolution_clock::now();
@@ -116,15 +117,14 @@ int main() {
     auto duration_lapack =
         std::chrono::duration_cast<std::chrono::microseconds>(end_lapack -
                                                               start_lapack);
-    std::cout << "Solve time (LAPACK serial block Thomas): "
-              << duration_lapack.count() / 1000.0 << " ms" << std::endl;
+    std::cout << "  solve time: " << duration_lapack.count() / 1000.0 << " ms"
+              << std::endl;
     double max_err_lapack = 0.0;
     for (size_t i = 0; i < x_lapack.size(); ++i) {
         max_err_lapack =
             std::max(max_err_lapack, std::abs(x_lapack[i] - x_true[i]));
     }
-    std::cout << "Max error (LAPACK serial block Thomas): " << max_err_lapack
-              << std::endl;
+    std::cout << "  max error: " << max_err_lapack << std::endl;
     assert(max_err_lapack < 1e-8);
     return 0;
 }

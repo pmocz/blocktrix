@@ -1,14 +1,14 @@
-#include "bthomas_solver.hpp"
+#include "blocktrix_solver.hpp"
 #include <cmath> // For std::abs
 #include <cstring>
 #include <stdexcept>
 
-BThomasSolver::BThomasSolver(size_t n_blocks, size_t block_size)
+BlocktrixSolver::BlocktrixSolver(size_t n_blocks, size_t block_size)
     : n_blocks_(n_blocks), block_size_(block_size) {}
 
-void BThomasSolver::set_blocks(const std::vector<double> &lower_blocks,
-                               const std::vector<double> &diag_blocks,
-                               const std::vector<double> &upper_blocks) {
+void BlocktrixSolver::set_blocks(const std::vector<double> &lower_blocks,
+                                 const std::vector<double> &diag_blocks,
+                                 const std::vector<double> &upper_blocks) {
     size_t bs = block_size_;
     if (diag_blocks.size() != n_blocks_ * bs * bs)
         throw std::invalid_argument("diag_blocks size mismatch");
@@ -22,7 +22,7 @@ void BThomasSolver::set_blocks(const std::vector<double> &lower_blocks,
 }
 
 // Helper: invert a small square matrix in place (row-major)
-void BThomasSolver::invert_block(std::vector<double> &block) {
+void BlocktrixSolver::invert_block(std::vector<double> &block) {
     size_t n = block_size_;
     std::vector<double> inv(n * n, 0.0);
     for (size_t i = 0; i < n; ++i)
@@ -56,7 +56,7 @@ static void transpose_square(const std::vector<double> &in,
             out[j * n + i] = in[i * n + j];
 }
 
-std::vector<double> BThomasSolver::solve(const std::vector<double> &b) {
+std::vector<double> BlocktrixSolver::solve(const std::vector<double> &b) {
     if (b.size() != n_blocks_ * block_size_)
         throw std::invalid_argument("RHS size mismatch");
     size_t N = n_blocks_;
@@ -141,7 +141,8 @@ std::vector<double> BThomasSolver::solve(const std::vector<double> &b) {
     return x;
 }
 
-std::vector<double> BThomasSolver::solve_lapack(const std::vector<double> &b) {
+std::vector<double>
+BlocktrixSolver::solve_lapack(const std::vector<double> &b) {
     if (b.size() != n_blocks_ * block_size_)
         throw std::invalid_argument("RHS size mismatch");
     size_t N = n_blocks_;

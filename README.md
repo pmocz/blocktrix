@@ -9,7 +9,7 @@ This is simple C++ playground code for solving block tridiagonal linear systems 
 - **General:** Works for any block size and number of blocks.
 - **Dependencies:** Requires LAPACK (for block LU and solve).
 - **Files:**
-  - `bthomas_solver.hpp`/`bthomas_solver.cpp`: The solver implementation
+  - `blocktrix_solver.hpp`/`blocktrix_solver.cpp`: The solver implementation
   - `test_blocktrix.cpp`: Example/test program
 
 ## Usage
