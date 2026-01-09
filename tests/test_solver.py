@@ -1,0 +1,181 @@
+"""Tests for blocktrix solver."""
+
+import jax
+import jax.numpy as jnp
+import pytest
+
+from blocktrix import (
+    solve_block_tridiagonal,
+    build_block_tridiagonal_matrix,
+    random_block_tridiagonal,
+)
+
+
+class TestSolveBlockTridiagonal:
+    """Tests for the block tri-diagonal solver."""
+
+    def test_small_system(self):
+        """Test a small 3-block system."""
+        key = jax.random.PRNGKey(42)
+        n_blocks, block_size = 3, 2
+
+        lower, diag, upper, rhs = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        x = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs)
+
+        # Verify solution
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        residual = jnp.linalg.norm(M @ x.flatten() - rhs.flatten())
+        assert residual < 1e-5
+
+    def test_larger_system(self):
+        """Test a larger system."""
+        key = jax.random.PRNGKey(123)
+        n_blocks, block_size = 10, 4
+
+        lower, diag, upper, rhs = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        x = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs)
+
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        relative_error = jnp.linalg.norm(
+            M @ x.flatten() - rhs.flatten()
+        ) / jnp.linalg.norm(rhs.flatten())
+        assert relative_error < 1e-5
+
+    def test_multiple_rhs(self):
+        """Test solving with multiple right-hand sides."""
+        key = jax.random.PRNGKey(456)
+        n_blocks, block_size = 5, 3
+        n_rhs = 4
+
+        lower, diag, upper, _ = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        key2 = jax.random.PRNGKey(789)
+        rhs_multi = jax.random.normal(key2, (n_blocks, block_size, n_rhs))
+
+        x_multi = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs_multi)
+
+        assert x_multi.shape == (n_blocks, block_size, n_rhs)
+
+        # Verify each RHS solution
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        for k in range(n_rhs):
+            x_k = x_multi[..., k].flatten()
+            rhs_k = rhs_multi[..., k].flatten()
+            residual = jnp.linalg.norm(M @ x_k - rhs_k)
+            assert residual < 1e-5
+
+    def test_compare_to_direct_solve(self):
+        """Compare block Thomas to direct solve."""
+        key = jax.random.PRNGKey(999)
+        n_blocks, block_size = 6, 3
+
+        lower, diag, upper, rhs = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        x_block = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs)
+
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        x_direct = jnp.linalg.solve(M, rhs.flatten())
+
+        diff = jnp.linalg.norm(x_block.flatten() - x_direct)
+        assert diff < 1e-5
+
+    def test_single_block(self):
+        """Test edge case with single block (just a matrix solve)."""
+        key = jax.random.PRNGKey(111)
+        n_blocks, block_size = 1, 4
+
+        keys = jax.random.split(key, 2)
+        diag = jax.random.normal(keys[0], (1, block_size, block_size))
+        diag = diag + jnp.eye(block_size) * 5  # Make well-conditioned
+        rhs = jax.random.normal(keys[1], (1, block_size))
+
+        lower = jnp.zeros((0, block_size, block_size))
+        upper = jnp.zeros((0, block_size, block_size))
+
+        x = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs)
+
+        # Direct solve for comparison
+        x_direct = jnp.linalg.solve(diag[0], rhs[0])
+        diff = jnp.linalg.norm(x[0] - x_direct)
+        assert diff < 1e-6
+
+
+class TestBuildBlockTridiagonalMatrix:
+    """Tests for building the full matrix."""
+
+    def test_structure(self):
+        """Verify the matrix has correct tri-diagonal block structure."""
+        n_blocks, block_size = 4, 2
+
+        lower = jnp.ones((n_blocks - 1, block_size, block_size)) * 1
+        diag = jnp.ones((n_blocks, block_size, block_size)) * 2
+        upper = jnp.ones((n_blocks - 1, block_size, block_size)) * 3
+
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+
+        N = n_blocks * block_size
+        assert M.shape == (N, N)
+
+        # Check diagonal blocks
+        for i in range(n_blocks):
+            block = M[
+                i * block_size : (i + 1) * block_size,
+                i * block_size : (i + 1) * block_size,
+            ]
+            assert jnp.allclose(block, 2.0)
+
+        # Check upper diagonal blocks
+        for i in range(n_blocks - 1):
+            block = M[
+                i * block_size : (i + 1) * block_size,
+                (i + 1) * block_size : (i + 2) * block_size,
+            ]
+            assert jnp.allclose(block, 3.0)
+
+        # Check lower diagonal blocks
+        for i in range(n_blocks - 1):
+            block = M[
+                (i + 1) * block_size : (i + 2) * block_size,
+                i * block_size : (i + 1) * block_size,
+            ]
+            assert jnp.allclose(block, 1.0)
+
+
+class TestRandomBlockTridiagonal:
+    """Tests for random system generation."""
+
+    def test_shapes(self):
+        """Verify output shapes."""
+        key = jax.random.PRNGKey(42)
+        n_blocks, block_size = 5, 3
+
+        lower, diag, upper, rhs = random_block_tridiagonal(key, n_blocks, block_size)
+
+        assert lower.shape == (n_blocks - 1, block_size, block_size)
+        assert diag.shape == (n_blocks, block_size, block_size)
+        assert upper.shape == (n_blocks - 1, block_size, block_size)
+        assert rhs.shape == (n_blocks, block_size)
+
+    def test_diagonal_dominance(self):
+        """Verify diagonal dominance when requested."""
+        key = jax.random.PRNGKey(42)
+        n_blocks, block_size = 5, 3
+
+        lower, diag, upper, _ = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        # Build full matrix and check condition number is reasonable
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        cond = jnp.linalg.cond(M)
+        assert cond < 1e6  # Well-conditioned
