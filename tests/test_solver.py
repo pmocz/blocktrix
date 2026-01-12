@@ -2,7 +2,6 @@
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from blocktrix import (
     solve_block_tridiagonal,

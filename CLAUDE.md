@@ -8,8 +8,9 @@ A JAX library for solving block tri-diagonal matrix systems.
 blocktrix/
 ├── blocktrix/              # Main package
 │   ├── __init__.py         # Public API exports
-│   ├── solver_bcyclic.py  # B-cyclic solver implementation
-│   └── solver_thomas.py    # Thomas solver implementation
+│   ├── solver_bcyclic.py   # B-cyclic solver implementation
+│   ├── solver_thomas.py    # Thomas solver implementation
+│   └── utils.py            # Helpers
 ├── tests/
 │   └── test_solver.py      # Unit tests
 ├── pyproject.toml          # Package configuration
