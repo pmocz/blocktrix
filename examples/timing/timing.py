@@ -16,8 +16,7 @@ Timing comparison of block tri-diagonal solvers.
 
 Compares:
 - Thomas algorithm (serial)
-- B-cyclic algorithm (parallel-friendly)
-- Vanilla dense solve (build full matrix + jnp.linalg.solve)
+- B-cyclic algorithm (parallel)
 """
 
 
