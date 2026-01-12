@@ -1,5 +1,25 @@
 # blocktrix
 
+[![Repo Status][status-badge]][status-link]
+[![PyPI Version Status][pypi-badge]][pypi-link]
+[![Test Status][workflow-test-badge]][workflow-test-link]
+[![Ruff][ruff-badge]][ruff-link]
+[![License][license-badge]][license-link]
+[![Software DOI][software-doi-badge]][software-doi-link]
+
+[status-link]:         https://www.repostatus.org/#active
+[status-badge]:        https://www.repostatus.org/badges/latest/active.svg
+[pypi-link]:           https://pypi.org/project/blocktrix
+[pypi-badge]:          https://img.shields.io/pypi/v/blocktrix?label=PyPI&logo=pypi
+[workflow-test-link]:  https://github.com/pmocz/blocktrix/actions/workflows/test-package.yml
+[workflow-test-badge]: https://github.com/pmocz/blocktrix/actions/workflows/test-package.yml/badge.svg?event=push
+[ruff-link]:           https://github.com/astral-sh/ruff
+[ruff-badge]:          https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json
+[license-link]:        https://opensource.org/licenses/MIT
+[license-badge]:       https://img.shields.io/badge/license-MIT-blue.svg
+[software-doi-link]:   https://doi.org/10.5281/zenodo.18226420
+[software-doi-badge]:  https://zenodo.org/badge/1132904104.svg
+
 A JAX library for efficiently solving block tri-diagonal matrix systems
 
 Author: [Philip Mocz (@pmocz)](https://github.com/pmocz/)
@@ -54,4 +74,14 @@ x = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
 
 If you use this software, please cite it as below.
 
-XXX
+```bibtex
+@software{Mocz_Blocktrix_2026,
+   author = {Mocz, Philip},
+      doi = {https://doi.org/10.5281/zenodo.18226420},
+    month = jan,
+    title = {{Blocktrix}},
+      url = {https://github.com/pmocz/blocktrix},
+  version = {0.0.4},
+     year = {2026}
+}
+```
