@@ -20,13 +20,13 @@
 [software-doi-link]:   https://doi.org/10.5281/zenodo.18226420
 [software-doi-badge]:  https://zenodo.org/badge/1132904104.svg
 
-A JAX library for efficiently solving block tri-diagonal matrix systems
+A JAX library for efficiently solving block tri-diagonal matrix systems on GPUs.
 
 Author: [Philip Mocz (@pmocz)](https://github.com/pmocz/)
 
-Implements both a block **Thomas** (serial) solver and a block cyclic reduction **B-cyclic** (parallel) solver.
+Implements both a block [**Thomas**](https://en.wikipedia.org/wiki/Tridiagonal_matrix_algorithm) (serial) solver and a block cyclic reduction [**B-cyclic**](https://ui.adsabs.harvard.edu/abs/2010JCoPh.229.6392H) (parallel) solver.
 
-⚠️ **Warning: Work in Progress**
+⚠️ **Warning: Work in Progress** ⚠️
 
 This library is still under active development and is not guaranteed to work at this point XXX.
 
