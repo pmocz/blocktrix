@@ -79,7 +79,7 @@ def main():
     # unique_n_blocks = np.unique(n_blocks)
     unique_block_sizes = np.unique(block_sizes)[::-1]  # Reverse to plot largest first
 
-    # Plotting
+    # Plot Timing
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Use colormap for different block sizes
@@ -115,7 +115,7 @@ def main():
     ax.set_yscale("log", base=10)
     ax.set_xticks([256, 512, 1024, 2048])
     ax.set_xticklabels([256, 512, 1024, 2048])
-    ax.set_ylim(5e-2, 4e0)
+    ax.set_ylim(1e-3, 1e1)
     ax.set_xlabel("number of blocks", fontsize=12)
     ax.set_ylabel("time (s)", fontsize=12)
     ax.set_title(
@@ -127,6 +127,35 @@ def main():
     plt.savefig("timing.png", dpi=150)
     plt.close()
     print("Saved plot as timing.png")
+
+    # Plot Speedup
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for i, bs in enumerate(unique_block_sizes):
+        mask = block_sizes == bs
+        speedup = thomas_times[mask] / bcyclic_times[mask]
+        ax.plot(
+            n_blocks[mask],
+            speedup,
+            marker="o",
+            linestyle="-",
+            color=colors[i],
+            linewidth=2,
+            markersize=6,
+            label=f"bs={bs}",
+        )
+    ax.set_xscale("log", base=2)
+    ax.set_xticks([256, 512, 1024, 2048])
+    ax.set_xticklabels([256, 512, 1024, 2048])
+    ax.set_ylim(1, 120)
+    ax.set_xlabel("number of blocks", fontsize=12)
+    ax.set_ylabel("speedup", fontsize=12)
+    ax.set_title("Speedup of B-cyclic over Thomas", fontsize=14, fontweight="bold")
+    ax.legend(loc="upper left", framealpha=0.9, ncol=1)
+    ax.grid(True, which="both", ls=":", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig("speedup.png", dpi=150)
+    plt.close()
+    print("Saved plot as speedup.png")
 
 
 if __name__ == "__main__":

@@ -67,7 +67,7 @@ def main():
     print(f"Number of blocks: {n_blocks}")
     print(f"Block size: {block_size} x {block_size}")
     print(f"Total matrix size: {n_blocks * block_size} x {n_blocks * block_size}")
-    print(f"=" * 50)
+    print(f"-" * 50)
     print()
 
     # Generate random system
@@ -94,11 +94,12 @@ def main():
     print(f"  B-cyclic time: {bcyclic_time:.4f} s")
 
     # Check agreement between methods
-    error_bc_th = jnp.max(jnp.abs(x_thomas - x_bcyclic))
-    print(f"\n  Max error (Thomas vs B-cyclic): {error_bc_th:.2e}")
+    error_bt = jnp.max(jnp.abs(x_thomas - x_bcyclic))
+    print(f"\n  Max error (Thomas vs B-cyclic): {error_bt:.2e}")
+    assert error_bt < 1e-5
 
-    # Summary without vanilla
-    print("\n" + "=" * 50)
+    # Summary
+    print("\n" + "-" * 50)
     print("Timing summary:")
     print(f"  num blocks: {n_blocks}")
     print(f"  block size: {block_size}")
@@ -108,6 +109,7 @@ def main():
         print(f"  B-cyclic is {thomas_time / bcyclic_time:.2f}x faster than Thomas")
     else:
         print(f"  Thomas is {bcyclic_time / thomas_time:.2f}x faster than B-cyclic")
+    print(f"=" * 50)
     print()
     print()
 

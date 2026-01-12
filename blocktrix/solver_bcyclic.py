@@ -1,7 +1,6 @@
 import math
 import jax
 import jax.numpy as jnp
-from jax import lax
 from functools import partial
 
 """
@@ -15,96 +14,123 @@ Complexity: O(log(n) * m^3) where n = number of blocks, m = block size
 """
 
 
-def _make_eliminate_row(stride, n_blocks):
-    """Factory function to create eliminate_row with captured stride."""
+def _eliminate_level(D, L, U, B, stride, n_blocks, n_elim):
+    """
+    Eliminate all odd-multiple rows at a given level using batched LU solves.
 
-    def eliminate_row(carry, k):
-        """Eliminate row at position i = (2k+1) * stride."""
-        D, L, U, B, tape_Dinv_L_level, tape_Dinv_U_level, tape_Dinv_rhs_level = carry
-        i = (2 * k + 1) * stride
-        i_prev = i - stride
-        i_next = i + stride
+    At each level with stride s, we eliminate rows at positions i = (2k+1)*s
+    for k = 0, 1, ..., n_elim-1. All these LU solves are independent and
+    can be computed in parallel using vmap.
+    """
+    m = D.shape[1]
 
-        # Compute D_i^{-1} @ L_i, D_i^{-1} @ U_i, D_i^{-1} @ B_i
-        D_i = D[i]
-        L_i = L[i]
-        U_i = U[i]
-        B_i = B[i]
+    # Compute indices for rows to eliminate
+    ks = jnp.arange(n_elim)
+    elim_indices = (2 * ks + 1) * stride  # rows being eliminated
+    prev_indices = elim_indices - stride  # rows before (always valid)
+    next_indices = elim_indices + stride  # rows after (may be out of bounds)
 
-        Dinv_L = jax.scipy.linalg.solve(D_i, L_i)
-        Dinv_U = jax.scipy.linalg.solve(D_i, U_i)
-        Dinv_B = jax.scipy.linalg.solve(D_i, B_i)
+    # Gather matrices for eliminated rows
+    D_elim = D[elim_indices]  # (n_elim, m, m)
+    L_elim = L[elim_indices]  # (n_elim, m, m)
+    U_elim = U[elim_indices]  # (n_elim, m, m)
+    B_elim = B[elim_indices]  # (n_elim, m, k)
 
-        # Store in tape for back-substitution
-        tape_Dinv_L_level = tape_Dinv_L_level.at[i].set(Dinv_L)
-        tape_Dinv_U_level = tape_Dinv_U_level.at[i].set(Dinv_U)
-        tape_Dinv_rhs_level = tape_Dinv_rhs_level.at[i].set(Dinv_B)
+    # Batched LU solves: D_i^{-1} @ [L_i, U_i, B_i] for all eliminated rows
+    # jax.scipy.linalg.solve supports batching on leading dimensions
+    Dinv_L = jax.scipy.linalg.solve(D_elim, L_elim)  # (n_elim, m, m)
+    Dinv_U = jax.scipy.linalg.solve(D_elim, U_elim)  # (n_elim, m, m)
+    Dinv_B = jax.scipy.linalg.solve(D_elim, B_elim)  # (n_elim, m, k)
 
-        # Update row i_prev
-        U_prev = U[i_prev]
-        D = D.at[i_prev].set(D[i_prev] - U_prev @ Dinv_L)
-        B = B.at[i_prev].set(B[i_prev] - U_prev @ Dinv_B)
-        U = U.at[i_prev].set(-U_prev @ Dinv_U)
+    # Store tape values using scatter
+    tape_Dinv_L_level = jnp.zeros((n_blocks, m, m)).at[elim_indices].set(Dinv_L)
+    tape_Dinv_U_level = jnp.zeros((n_blocks, m, m)).at[elim_indices].set(Dinv_U)
+    tape_Dinv_rhs_level = (
+        jnp.zeros((n_blocks, m, B.shape[-1])).at[elim_indices].set(Dinv_B)
+    )
 
-        # Update row i_next (if it exists)
-        def update_next(args):
-            D, L, B, Dinv_L, Dinv_U, Dinv_B = args
-            L_next = L[i_next]
-            D = D.at[i_next].set(D[i_next] - L_next @ Dinv_U)
-            B = B.at[i_next].set(B[i_next] - L_next @ Dinv_B)
-            L = L.at[i_next].set(-L_next @ Dinv_L)
-            return D, L, B
+    # Update previous rows (i_prev = i - stride): always valid
+    U_prev = U[prev_indices]  # (n_elim, m, m)
+    D_prev_update = D[prev_indices] - jnp.einsum("bij,bjk->bik", U_prev, Dinv_L)
+    B_prev_update = B[prev_indices] - jnp.einsum("bij,bjk->bik", U_prev, Dinv_B)
+    U_prev_update = -jnp.einsum("bij,bjk->bik", U_prev, Dinv_U)
 
-        def no_update(args):
-            D, L, B, _, _, _ = args
-            return D, L, B
+    D = D.at[prev_indices].set(D_prev_update)
+    B = B.at[prev_indices].set(B_prev_update)
+    U = U.at[prev_indices].set(U_prev_update)
 
-        D, L, B = lax.cond(
-            i_next < n_blocks,
-            update_next,
-            no_update,
-            (D, L, B, Dinv_L, Dinv_U, Dinv_B),
-        )
+    # Update next rows (i_next = i + stride): only if in bounds
+    # Create mask for valid next indices
+    valid_next = next_indices < n_blocks
 
-        return (
-            D,
-            L,
-            U,
-            B,
-            tape_Dinv_L_level,
-            tape_Dinv_U_level,
-            tape_Dinv_rhs_level,
-        ), None
+    # Gather L_next, but use zeros for out-of-bounds indices
+    safe_next_indices = jnp.where(valid_next, next_indices, 0)
+    L_next = L[safe_next_indices]  # (n_elim, m, m)
 
-    return eliminate_row
+    # Compute updates (will be masked)
+    D_next_vals = D[safe_next_indices] - jnp.einsum("bij,bjk->bik", L_next, Dinv_U)
+    B_next_vals = B[safe_next_indices] - jnp.einsum("bij,bjk->bik", L_next, Dinv_B)
+    L_next_vals = -jnp.einsum("bij,bjk->bik", L_next, Dinv_L)
+
+    # Only update where valid_next is True
+    # Use where to mask updates
+    D_next_update = jnp.where(
+        valid_next[:, None, None], D_next_vals, D[safe_next_indices]
+    )
+    B_next_update = jnp.where(
+        valid_next[:, None, None], B_next_vals, B[safe_next_indices]
+    )
+    L_next_update = jnp.where(
+        valid_next[:, None, None], L_next_vals, L[safe_next_indices]
+    )
+
+    D = D.at[safe_next_indices].set(D_next_update)
+    B = B.at[safe_next_indices].set(B_next_update)
+    L = L.at[safe_next_indices].set(L_next_update)
+
+    return D, L, U, B, tape_Dinv_L_level, tape_Dinv_U_level, tape_Dinv_rhs_level
 
 
-def _make_recover_row(stride, n_blocks, tape_Dinv_L, tape_Dinv_U, tape_Dinv_rhs, level):
-    """Factory function to create recover_row with captured values."""
+def _recover_level(
+    x, tape_Dinv_L, tape_Dinv_U, tape_Dinv_rhs, stride, n_blocks, n_elim, level
+):
+    """
+    Recover all eliminated rows at a given level using batched operations.
 
-    def recover_row(x, k):
-        """Recover row at position i = (2k+1) * stride."""
-        i = (2 * k + 1) * stride
-        i_prev = i - stride
-        i_next = i + stride
+    At each level with stride s, we recover rows at positions i = (2k+1)*s
+    for k = 0, 1, ..., n_elim-1.
+    """
+    # Compute indices
+    ks = jnp.arange(n_elim)
+    elim_indices = (2 * ks + 1) * stride
+    prev_indices = elim_indices - stride
+    next_indices = elim_indices + stride
 
-        # x_i = D_i^{-1} @ (B_i - L_i @ x_{i-s} - U_i @ x_{i+s})
-        # The tape stores values for row i (the eliminated row)
-        x_i = tape_Dinv_rhs[level, i] - tape_Dinv_L[level, i] @ x[i_prev]
+    # Gather tape values for eliminated rows
+    Dinv_rhs = tape_Dinv_rhs[level, elim_indices]  # (n_elim, m, k)
+    Dinv_L = tape_Dinv_L[level, elim_indices]  # (n_elim, m, m)
+    Dinv_U = tape_Dinv_U[level, elim_indices]  # (n_elim, m, m)
 
-        # Subtract contribution from i_next if it exists
-        # Note: tape_Dinv_U[level, i] stores D_i^{-1} @ U_i for the eliminated row i
-        x_i = lax.cond(
-            i_next < n_blocks,
-            lambda args: args[0] - tape_Dinv_U[level, i] @ x[args[1]],
-            lambda args: args[0],
-            (x_i, i_next),
-        )
+    # Gather x values for previous rows (always valid)
+    x_prev = x[prev_indices]  # (n_elim, m, k)
 
-        x = x.at[i].set(x_i)
-        return x, None
+    # x_i = Dinv_rhs - Dinv_L @ x_prev - Dinv_U @ x_next (if valid)
+    x_elim = Dinv_rhs - jnp.einsum("bij,bjk->bik", Dinv_L, x_prev)
 
-    return recover_row
+    # Handle next rows (may be out of bounds)
+    valid_next = next_indices < n_blocks
+    safe_next_indices = jnp.where(valid_next, next_indices, 0)
+    x_next = x[safe_next_indices]  # (n_elim, m, k)
+
+    # Subtract contribution from next rows where valid
+    next_contrib = jnp.einsum("bij,bjk->bik", Dinv_U, x_next)
+    next_contrib = jnp.where(valid_next[:, None, None], next_contrib, 0.0)
+    x_elim = x_elim - next_contrib
+
+    # Scatter back to x
+    x = x.at[elim_indices].set(x_elim)
+
+    return x
 
 
 @partial(jax.jit, static_argnums=(0,))
@@ -178,23 +204,13 @@ def solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs):
     U = upper_padded
     B = rhs
 
-    # Reduction phase - unrolled at compile time
+    # Reduction phase - unrolled at compile time with batched LU solves
     for level in range(n_levels):
         stride = 2**level
         n_elim = n_blocks // (2 * stride)
 
-        eliminate_row = _make_eliminate_row(stride, n_blocks)
-
-        tape_Dinv_L_level = tape_Dinv_L[level]
-        tape_Dinv_U_level = tape_Dinv_U[level]
-        tape_Dinv_rhs_level = tape_Dinv_rhs[level]
-
-        (D, L, U, B, tape_Dinv_L_level, tape_Dinv_U_level, tape_Dinv_rhs_level), _ = (
-            lax.scan(
-                eliminate_row,
-                (D, L, U, B, tape_Dinv_L_level, tape_Dinv_U_level, tape_Dinv_rhs_level),
-                jnp.arange(n_elim),
-            )
+        D, L, U, B, tape_Dinv_L_level, tape_Dinv_U_level, tape_Dinv_rhs_level = (
+            _eliminate_level(D, L, U, B, stride, n_blocks, n_elim)
         )
 
         tape_Dinv_L = tape_Dinv_L.at[level].set(tape_Dinv_L_level)
@@ -205,16 +221,14 @@ def solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs):
     x = jnp.zeros_like(rhs)
     x = x.at[0].set(jax.scipy.linalg.solve(D[0], B[0]))
 
-    # Back-substitution phase - unrolled at compile time
+    # Back-substitution phase - unrolled at compile time with batched operations
     for level in range(n_levels - 1, -1, -1):
         stride = 2**level
         n_elim = n_blocks // (2 * stride)
 
-        recover_row = _make_recover_row(
-            stride, n_blocks, tape_Dinv_L, tape_Dinv_U, tape_Dinv_rhs, level
+        x = _recover_level(
+            x, tape_Dinv_L, tape_Dinv_U, tape_Dinv_rhs, stride, n_blocks, n_elim, level
         )
-
-        x, _ = lax.scan(recover_row, x, jnp.arange(n_elim))
 
     # Restore original shape
     if len(rhs_shape) == 2:
