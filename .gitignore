@@ -8,3 +8,5 @@ references/
 build/
 dist/
 .vscode/
+slurm-*.out
+slurm-*.err
