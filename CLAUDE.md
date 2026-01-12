@@ -6,13 +6,14 @@ A JAX library for solving block tri-diagonal matrix systems.
 
 ```
 blocktrix/
-├── blocktrix/          # Main package
-│   ├── __init__.py     # Public API exports
-│   └── solver.py       # Core solver implementation
+├── blocktrix/              # Main package
+│   ├── __init__.py         # Public API exports
+│   ├── solver_bcyclic.py  # B-cyclic solver implementation
+│   └── solver_thomas.py    # Thomas solver implementation
 ├── tests/
-│   └── test_solver.py  # Unit tests
-├── pyproject.toml      # Package configuration
-└── CLAUDE.md           # This file
+│   └── test_solver.py      # Unit tests
+├── pyproject.toml          # Package configuration
+└── CLAUDE.md               # This file
 ```
 
 ## Development
@@ -41,14 +42,26 @@ pytest --cov=blocktrix
 - `build_block_tridiagonal_matrix(lower, diag, upper)` - Utility to construct full matrix
 - `random_block_tridiagonal(key, n_blocks, block_size)` - Generate random test systems
 
-## Algorithm
+## Thomas Algorithm
 
-Uses the block Thomas algorithm (block LU decomposition):
+The serial block Thomas algorithm (block LU decomposition):
 
 1. **Forward sweep**: Eliminate sub-diagonal blocks by computing multipliers and updating diagonal/RHS
 2. **Backward substitution**: Solve from last block to first
 
 Complexity: O(n * m^3) where n = number of blocks, m = block size
+
+## B-cyclic Algorithm
+
+The more advanced parallel B-cyclic algorithm. 
+
+* Recursively eliminates alternating block rows, halving the system size at each level.
+
+* Each reduction step factors diagonal blocks and updates neighboring blocks using dense matrix–matrix operations.
+
+* Once a small coarse system is solved, the algorithm back-substitutes to recover the full solution.
+
+Complexity: O(log(n) * m^3) 
 
 ## Notes
 

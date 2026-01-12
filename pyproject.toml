@@ -1,43 +1,32 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "blocktrix"
-version = "0.1.0"
 description = "A JAX library for solving block tri-diagonal matrix systems"
+authors = [
+    { name = "Philip Mocz", email = "philip.mocz@gmail.com" },
+]
 readme = "README.md"
-license = {text = "MIT"}
-requires-python = ">=3.9"
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering :: Mathematics",
-]
-dependencies = [
-    "jax>=0.4.0",
-    "jaxlib>=0.4.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-]
-
-[project.urls]
-Homepage = "https://github.com/pmocz/blocktrix"
-Issues = "https://github.com/pmocz/blocktrix/issues"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [tool.setuptools.packages.find]
 include = ["blocktrix*"]
+exclude = ["paper"]
+
+[project.urls]
+Documentation = "XXX"
+Homepage = "https://github.com/pmocz/blocktrix"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+optional-dependencies.dev = {file = ["requirements-dev.txt"]}
+optional-dependencies.cuda12 = {file = ["requirements-cuda12.txt"]}
+
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
+
+[build-system]
+requires = ["setuptools>=70.1.1", "wheel", "setuptools-git-versioning>=2.0,<3"]
+build-backend = "setuptools.build_meta"

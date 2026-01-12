@@ -1,14 +1,18 @@
 # blocktrix
 
-A JAX library for solving block tri-diagonal matrix systems using the block Thomas algorithm.
+A JAX library for efficiently solving block tri-diagonal matrix systems
+
+Author: [Philip Mocz (@pmocz)](https://github.com/pmocz/)
 
 ## Installation
 
 ```bash
-pip install -e .
+pip install blocktrix
 ```
 
 ## Usage
+
+XXX
 
 ```python
 import jax
@@ -24,6 +28,18 @@ lower, diag, upper, rhs = random_block_tridiagonal(key, n_blocks, block_size)
 x = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs)
 ```
 
-## License
+## It's fast!
 
-MIT
+XXX
+
+## Links
+
+* [Code repository](https://github.com/pmocz/blocktrix)
+* [Documentation](XXX) XXX
+
+
+## Cite this repository
+
+If you use this software, please cite it as below.
+
+XXX

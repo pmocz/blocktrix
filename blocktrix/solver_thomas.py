@@ -1,5 +1,5 @@
 """
-Core solver for block tri-diagonal matrix systems.
+Core Thomas solver for block tri-diagonal matrix systems.
 
 A block tri-diagonal matrix has the form:
     [B0  C0  0   0   ... 0  ]
