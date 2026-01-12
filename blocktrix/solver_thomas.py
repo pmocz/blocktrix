@@ -1,3 +1,8 @@
+import jax
+import jax.numpy as jnp
+from jax import lax
+from functools import partial
+
 """
 Core Thomas solver for block tri-diagonal matrix systems.
 
@@ -11,14 +16,9 @@ A block tri-diagonal matrix has the form:
 where A_i, B_i, C_i are square blocks of size (m x m).
 """
 
-import jax
-import jax.numpy as jnp
-from jax import lax
-from functools import partial
-
 
 @partial(jax.jit, static_argnums=(0,))
-def solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs):
+def solve_block_tridiagonal_thomas(n_blocks, lower, diag, upper, rhs):
     """
     Solve a block tri-diagonal system using the block Thomas algorithm.
 
@@ -114,39 +114,3 @@ def solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs):
         x = x[..., 0]
 
     return x
-
-
-def build_block_tridiagonal_matrix(lower, diag, upper):
-    """
-    Build the full block tri-diagonal matrix from components.
-
-    Parameters
-    ----------
-    lower : jnp.ndarray, shape (n_blocks-1, m, m)
-        Sub-diagonal blocks.
-    diag : jnp.ndarray, shape (n_blocks, m, m)
-        Diagonal blocks.
-    upper : jnp.ndarray, shape (n_blocks-1, m, m)
-        Super-diagonal blocks.
-
-    Returns
-    -------
-    M : jnp.ndarray, shape (n_blocks*m, n_blocks*m)
-        The full matrix.
-    """
-    n_blocks = diag.shape[0]
-    m = diag.shape[1]
-    N = n_blocks * m
-
-    M = jnp.zeros((N, N))
-
-    for i in range(n_blocks):
-        M = M.at[i * m : (i + 1) * m, i * m : (i + 1) * m].set(diag[i])
-
-    for i in range(n_blocks - 1):
-        M = M.at[i * m : (i + 1) * m, (i + 1) * m : (i + 2) * m].set(upper[i])
-
-    for i in range(n_blocks - 1):
-        M = M.at[(i + 1) * m : (i + 2) * m, i * m : (i + 1) * m].set(lower[i])
-
-    return M

@@ -1,10 +1,8 @@
 from importlib.metadata import version, PackageNotFoundError
 
-from blocktrix.solver_thomas import (
-    solve_block_tridiagonal,
-    build_block_tridiagonal_matrix,
-)
-from blocktrix.utils import random_block_tridiagonal
+from blocktrix.solver_thomas import solve_block_tridiagonal_thomas
+from blocktrix.solver_bcyclic import solve_block_tridiagonal_bcyclic
+from blocktrix.utils import random_block_tridiagonal, build_block_tridiagonal_matrix
 
 """
 blocktrix: A JAX library for solving block tri-diagonal matrix systems.
@@ -17,6 +15,7 @@ except PackageNotFoundError:
 
 __all__ = [
     "solve_block_tridiagonal",
+    "solve_block_tridiagonal_bcyclic",
     "build_block_tridiagonal_matrix",
     "random_block_tridiagonal",
 ]

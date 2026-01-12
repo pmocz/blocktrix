@@ -4,7 +4,8 @@ import jax
 import jax.numpy as jnp
 
 from blocktrix import (
-    solve_block_tridiagonal,
+    solve_block_tridiagonal_thomas,
+    solve_block_tridiagonal_bcyclic,
     build_block_tridiagonal_matrix,
     random_block_tridiagonal,
 )
@@ -22,7 +23,7 @@ class TestSolveBlockTridiagonal:
             key, n_blocks, block_size, diag_dominant=True
         )
 
-        x = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs)
+        x = solve_block_tridiagonal_thomas(n_blocks, lower, diag, upper, rhs)
 
         # Verify solution
         M = build_block_tridiagonal_matrix(lower, diag, upper)
@@ -38,7 +39,7 @@ class TestSolveBlockTridiagonal:
             key, n_blocks, block_size, diag_dominant=True
         )
 
-        x = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs)
+        x = solve_block_tridiagonal_thomas(n_blocks, lower, diag, upper, rhs)
 
         M = build_block_tridiagonal_matrix(lower, diag, upper)
         relative_error = jnp.linalg.norm(
@@ -59,7 +60,9 @@ class TestSolveBlockTridiagonal:
         key2 = jax.random.PRNGKey(789)
         rhs_multi = jax.random.normal(key2, (n_blocks, block_size, n_rhs))
 
-        x_multi = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs_multi)
+        x_multi = solve_block_tridiagonal_thomas(
+            n_blocks, lower, diag, upper, rhs_multi
+        )
 
         assert x_multi.shape == (n_blocks, block_size, n_rhs)
 
@@ -80,7 +83,7 @@ class TestSolveBlockTridiagonal:
             key, n_blocks, block_size, diag_dominant=True
         )
 
-        x_block = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs)
+        x_block = solve_block_tridiagonal_thomas(n_blocks, lower, diag, upper, rhs)
 
         M = build_block_tridiagonal_matrix(lower, diag, upper)
         x_direct = jnp.linalg.solve(M, rhs.flatten())
@@ -101,7 +104,7 @@ class TestSolveBlockTridiagonal:
         lower = jnp.zeros((0, block_size, block_size))
         upper = jnp.zeros((0, block_size, block_size))
 
-        x = solve_block_tridiagonal(n_blocks, lower, diag, upper, rhs)
+        x = solve_block_tridiagonal_thomas(n_blocks, lower, diag, upper, rhs)
 
         # Direct solve for comparison
         x_direct = jnp.linalg.solve(diag[0], rhs[0])
@@ -178,3 +181,132 @@ class TestRandomBlockTridiagonal:
         M = build_block_tridiagonal_matrix(lower, diag, upper)
         cond = jnp.linalg.cond(M)
         assert cond < 1e6  # Well-conditioned
+
+
+class TestSolveBlockTridiagonalBcyclic:
+    """Tests for the B-cyclic block tri-diagonal solver."""
+
+    def test_small_system(self):
+        """Test a small 4-block system (power of 2)."""
+        key = jax.random.PRNGKey(42)
+        n_blocks, block_size = 4, 2
+
+        lower, diag, upper, rhs = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        x = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
+
+        # Verify solution
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        residual = jnp.linalg.norm(M @ x.flatten() - rhs.flatten())
+        assert residual < 1e-5
+
+    def test_larger_system(self):
+        """Test a larger system (power of 2)."""
+        key = jax.random.PRNGKey(123)
+        n_blocks, block_size = 16, 4
+
+        lower, diag, upper, rhs = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        x = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
+
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        relative_error = jnp.linalg.norm(
+            M @ x.flatten() - rhs.flatten()
+        ) / jnp.linalg.norm(rhs.flatten())
+        assert relative_error < 1e-5
+
+    def test_multiple_rhs(self):
+        """Test solving with multiple right-hand sides."""
+        key = jax.random.PRNGKey(456)
+        n_blocks, block_size = 8, 3
+        n_rhs = 4
+
+        lower, diag, upper, _ = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        key2 = jax.random.PRNGKey(789)
+        rhs_multi = jax.random.normal(key2, (n_blocks, block_size, n_rhs))
+
+        x_multi = solve_block_tridiagonal_bcyclic(
+            n_blocks, lower, diag, upper, rhs_multi
+        )
+
+        assert x_multi.shape == (n_blocks, block_size, n_rhs)
+
+        # Verify each RHS solution
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        for k in range(n_rhs):
+            x_k = x_multi[..., k].flatten()
+            rhs_k = rhs_multi[..., k].flatten()
+            residual = jnp.linalg.norm(M @ x_k - rhs_k)
+            assert residual < 1e-5
+
+    def test_compare_to_thomas(self):
+        """Compare B-cyclic to Thomas solver."""
+        key = jax.random.PRNGKey(999)
+        n_blocks, block_size = 8, 3
+
+        lower, diag, upper, rhs = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        x_bcyclic = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
+        x_thomas = solve_block_tridiagonal_thomas(n_blocks, lower, diag, upper, rhs)
+
+        assert jnp.allclose(x_bcyclic, x_thomas, rtol=1e-5)
+
+    def test_single_block(self):
+        """Test edge case with single block."""
+        key = jax.random.PRNGKey(111)
+        n_blocks, block_size = 1, 4
+
+        keys = jax.random.split(key, 2)
+        diag = jax.random.normal(keys[0], (1, block_size, block_size))
+        diag = diag + jnp.eye(block_size) * 5  # Make well-conditioned
+        rhs = jax.random.normal(keys[1], (1, block_size))
+
+        lower = jnp.zeros((0, block_size, block_size))
+        upper = jnp.zeros((0, block_size, block_size))
+
+        x = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
+
+        # Direct solve for comparison
+        x_direct = jnp.linalg.solve(diag[0], rhs[0])
+        diff = jnp.linalg.norm(x[0] - x_direct)
+        assert diff < 1e-6
+
+    def test_two_blocks(self):
+        """Test with two blocks (simplest non-trivial case)."""
+        key = jax.random.PRNGKey(222)
+        n_blocks, block_size = 2, 3
+
+        lower, diag, upper, rhs = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        x = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
+
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        residual = jnp.linalg.norm(M @ x.flatten() - rhs.flatten())
+        assert residual < 1e-5
+
+    def test_various_power_of_two_sizes(self):
+        """Test various power-of-2 system sizes."""
+        key = jax.random.PRNGKey(333)
+        block_size = 2
+
+        for n_blocks in [2, 4, 8, 16, 32]:
+            lower, diag, upper, rhs = random_block_tridiagonal(
+                key, n_blocks, block_size, diag_dominant=True
+            )
+
+            x = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
+
+            M = build_block_tridiagonal_matrix(lower, diag, upper)
+            residual = jnp.linalg.norm(M @ x.flatten() - rhs.flatten())
+            assert residual < 1e-4, f"Failed for n_blocks={n_blocks}"
