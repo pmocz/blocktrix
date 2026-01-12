@@ -1,5 +1,3 @@
-"""Tests for blocktrix solver."""
-
 import jax
 import jax.numpy as jnp
 
@@ -10,8 +8,10 @@ from blocktrix import (
     random_block_tridiagonal,
 )
 
+"""Tests for blocktrix solver."""
 
-class TestSolveBlockTridiagonal:
+
+class TestSolveBlockTridiagonalThomas:
     """Tests for the block tri-diagonal solver."""
 
     def test_small_system(self):
@@ -110,77 +110,6 @@ class TestSolveBlockTridiagonal:
         x_direct = jnp.linalg.solve(diag[0], rhs[0])
         diff = jnp.linalg.norm(x[0] - x_direct)
         assert diff < 1e-6
-
-
-class TestBuildBlockTridiagonalMatrix:
-    """Tests for building the full matrix."""
-
-    def test_structure(self):
-        """Verify the matrix has correct tri-diagonal block structure."""
-        n_blocks, block_size = 4, 2
-
-        lower = jnp.ones((n_blocks - 1, block_size, block_size)) * 1
-        diag = jnp.ones((n_blocks, block_size, block_size)) * 2
-        upper = jnp.ones((n_blocks - 1, block_size, block_size)) * 3
-
-        M = build_block_tridiagonal_matrix(lower, diag, upper)
-
-        N = n_blocks * block_size
-        assert M.shape == (N, N)
-
-        # Check diagonal blocks
-        for i in range(n_blocks):
-            block = M[
-                i * block_size : (i + 1) * block_size,
-                i * block_size : (i + 1) * block_size,
-            ]
-            assert jnp.allclose(block, 2.0)
-
-        # Check upper diagonal blocks
-        for i in range(n_blocks - 1):
-            block = M[
-                i * block_size : (i + 1) * block_size,
-                (i + 1) * block_size : (i + 2) * block_size,
-            ]
-            assert jnp.allclose(block, 3.0)
-
-        # Check lower diagonal blocks
-        for i in range(n_blocks - 1):
-            block = M[
-                (i + 1) * block_size : (i + 2) * block_size,
-                i * block_size : (i + 1) * block_size,
-            ]
-            assert jnp.allclose(block, 1.0)
-
-
-class TestRandomBlockTridiagonal:
-    """Tests for random system generation."""
-
-    def test_shapes(self):
-        """Verify output shapes."""
-        key = jax.random.PRNGKey(42)
-        n_blocks, block_size = 5, 3
-
-        lower, diag, upper, rhs = random_block_tridiagonal(key, n_blocks, block_size)
-
-        assert lower.shape == (n_blocks - 1, block_size, block_size)
-        assert diag.shape == (n_blocks, block_size, block_size)
-        assert upper.shape == (n_blocks - 1, block_size, block_size)
-        assert rhs.shape == (n_blocks, block_size)
-
-    def test_diagonal_dominance(self):
-        """Verify diagonal dominance when requested."""
-        key = jax.random.PRNGKey(42)
-        n_blocks, block_size = 5, 3
-
-        lower, diag, upper, _ = random_block_tridiagonal(
-            key, n_blocks, block_size, diag_dominant=True
-        )
-
-        # Build full matrix and check condition number is reasonable
-        M = build_block_tridiagonal_matrix(lower, diag, upper)
-        cond = jnp.linalg.cond(M)
-        assert cond < 1e6  # Well-conditioned
 
 
 class TestSolveBlockTridiagonalBcyclic:
@@ -310,3 +239,74 @@ class TestSolveBlockTridiagonalBcyclic:
             M = build_block_tridiagonal_matrix(lower, diag, upper)
             residual = jnp.linalg.norm(M @ x.flatten() - rhs.flatten())
             assert residual < 1e-4, f"Failed for n_blocks={n_blocks}"
+
+
+class TestBuildBlockTridiagonalMatrix:
+    """Tests for building the full matrix."""
+
+    def test_structure(self):
+        """Verify the matrix has correct tri-diagonal block structure."""
+        n_blocks, block_size = 4, 2
+
+        lower = jnp.ones((n_blocks - 1, block_size, block_size)) * 1
+        diag = jnp.ones((n_blocks, block_size, block_size)) * 2
+        upper = jnp.ones((n_blocks - 1, block_size, block_size)) * 3
+
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+
+        N = n_blocks * block_size
+        assert M.shape == (N, N)
+
+        # Check diagonal blocks
+        for i in range(n_blocks):
+            block = M[
+                i * block_size : (i + 1) * block_size,
+                i * block_size : (i + 1) * block_size,
+            ]
+            assert jnp.allclose(block, 2.0)
+
+        # Check upper diagonal blocks
+        for i in range(n_blocks - 1):
+            block = M[
+                i * block_size : (i + 1) * block_size,
+                (i + 1) * block_size : (i + 2) * block_size,
+            ]
+            assert jnp.allclose(block, 3.0)
+
+        # Check lower diagonal blocks
+        for i in range(n_blocks - 1):
+            block = M[
+                (i + 1) * block_size : (i + 2) * block_size,
+                i * block_size : (i + 1) * block_size,
+            ]
+            assert jnp.allclose(block, 1.0)
+
+
+class TestRandomBlockTridiagonal:
+    """Tests for random system generation."""
+
+    def test_shapes(self):
+        """Verify output shapes."""
+        key = jax.random.PRNGKey(42)
+        n_blocks, block_size = 5, 3
+
+        lower, diag, upper, rhs = random_block_tridiagonal(key, n_blocks, block_size)
+
+        assert lower.shape == (n_blocks - 1, block_size, block_size)
+        assert diag.shape == (n_blocks, block_size, block_size)
+        assert upper.shape == (n_blocks - 1, block_size, block_size)
+        assert rhs.shape == (n_blocks, block_size)
+
+    def test_diagonal_dominance(self):
+        """Verify diagonal dominance when requested."""
+        key = jax.random.PRNGKey(42)
+        n_blocks, block_size = 5, 3
+
+        lower, diag, upper, _ = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        # Build full matrix and check condition number is reasonable
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        cond = jnp.linalg.cond(M)
+        assert cond < 1e6  # Well-conditioned

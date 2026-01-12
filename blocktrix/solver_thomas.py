@@ -4,7 +4,7 @@ from jax import lax
 from functools import partial
 
 """
-Core Thomas solver for block tri-diagonal matrix systems.
+Core Thomas solver (simple/serial) for block tri-diagonal matrix systems.
 
 A block tri-diagonal matrix has the form:
     [B0  C0  0   0   ... 0  ]

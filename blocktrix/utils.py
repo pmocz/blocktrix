@@ -1,9 +1,9 @@
+import jax
+import jax.numpy as jnp
+
 """
 Utility functions for block tri-diagonal systems.
 """
-
-import jax
-import jax.numpy as jnp
 
 
 def build_block_tridiagonal_matrix(lower, diag, upper):
