@@ -14,7 +14,7 @@ include = ["blocktrix*"]
 exclude = ["paper"]
 
 [project.urls]
-Documentation = "https://github.com/pmocz/blocktrix/README.md"
+Documentation = "https://github.com/pmocz/blocktrix"
 Homepage = "https://github.com/pmocz/blocktrix"
 
 [tool.setuptools.dynamic]

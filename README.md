@@ -43,7 +43,7 @@ x = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
 ## Links
 
 * [Code repository](https://github.com/pmocz/blocktrix)
-* [Documentation](https://github.com/pmocz/blocktrix/README.md)
+* [Documentation](https://github.com/pmocz/blocktrix)
 
 
 ## Cite this repository
