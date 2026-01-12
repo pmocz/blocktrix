@@ -22,10 +22,12 @@ dependencies = {file = ["requirements.txt"]}
 optional-dependencies.dev = {file = ["requirements-dev.txt"]}
 optional-dependencies.cuda12 = {file = ["requirements-cuda12.txt"]}
 
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
+
+[tool.setuptools-git-versioning]
+enabled = true
 
 [build-system]
 requires = ["setuptools>=70.1.1", "wheel", "setuptools-git-versioning>=2.0,<3"]
