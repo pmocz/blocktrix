@@ -142,6 +142,10 @@ def solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs):
     Back-substitution:
         Traverse levels in reverse to reconstruct eliminated variables.
     """
+    # Validate n_blocks is a power of 2
+    if n_blocks < 1 or (n_blocks & (n_blocks - 1)) != 0:
+        raise ValueError(f"n_blocks must be a power of 2, got {n_blocks}")
+
     rhs_shape = rhs.shape
     m = diag.shape[1]
 
