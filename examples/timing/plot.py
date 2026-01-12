@@ -1,0 +1,133 @@
+import glob
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+
+"""
+plot timing results from timing.py
+
+Usage:
+    python plot.py
+"""
+
+
+def read_timing_results(filename):
+    """
+    Read and parse the slurm*.out file
+    to get all the n_blocks and block_size combinations
+    and the corresponding times for Thomas and B-cyclic.
+
+    Example timing summary block:
+
+    Timing summary:
+      num blocks: 512
+      block size: 128
+      Thomas:     0.3040 s
+      B-cyclic:   0.2317 s
+    """
+    n_blocks_list = []
+    block_size_list = []
+    thomas_times = []
+    bcyclic_times = []
+
+    with open(filename, "r") as f:
+        lines = f.readlines()
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if "Timing summary:" in line:
+            n_blocks = int(lines[i + 1].split(":")[1].strip())
+            block_size = int(lines[i + 2].split(":")[1].strip())
+            thomas_time = float(lines[i + 3].split(":")[1].strip().split()[0])
+            bcyclic_time = float(lines[i + 4].split(":")[1].strip().split()[0])
+
+            n_blocks_list.append(n_blocks)
+            block_size_list.append(block_size)
+            thomas_times.append(thomas_time)
+            bcyclic_times.append(bcyclic_time)
+
+            i += 5  # Move past this block
+        else:
+            i += 1  # Move to next line
+
+    return (
+        np.array(n_blocks_list),
+        np.array(block_size_list),
+        np.array(thomas_times),
+        np.array(bcyclic_times),
+    )
+
+
+def main():
+    # Find the largest slurm*.out file
+    slurm_files = glob.glob("slurm-*.out")
+    if not slurm_files:
+        print("No slurm output files found.")
+        return
+
+    largest_file = max(slurm_files, key=os.path.getsize)
+    print(f"Reading timing results from {largest_file}")
+
+    (
+        n_blocks,
+        block_sizes,
+        thomas_times,
+        bcyclic_times,
+    ) = read_timing_results(largest_file)
+
+    # unique_n_blocks = np.unique(n_blocks)
+    unique_block_sizes = np.unique(block_sizes)[::-1]  # Reverse to plot largest first
+
+    # Plotting
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Use colormap for different block sizes
+    colors = plt.cm.tab10(np.arange(len(unique_block_sizes)))
+
+    for i, bs in enumerate(unique_block_sizes):
+        mask = block_sizes == bs
+        # Dashed line + filled marker for Thomas
+        ax.plot(
+            n_blocks[mask],
+            thomas_times[mask],
+            marker="o",
+            linestyle="--",
+            color=colors[i],
+            linewidth=2,
+            markersize=6,
+            markerfacecolor="none",
+            label=f"Thomas (bs={bs})",
+        )
+        # Solid line + empty marker for B-cyclic
+        ax.plot(
+            n_blocks[mask],
+            bcyclic_times[mask],
+            marker="s",
+            linestyle="-",
+            color=colors[i],
+            linewidth=2,
+            markersize=6,
+            label=f"B-cyclic (bs={bs})",
+        )
+
+    ax.set_xscale("log", base=2)
+    ax.set_yscale("log", base=10)
+    ax.set_xticks([256, 512, 1024, 2048])
+    ax.set_xticklabels([256, 512, 1024, 2048])
+    ax.set_ylim(5e-2, 4e0)
+    ax.set_xlabel("number of blocks", fontsize=12)
+    ax.set_ylabel("time (s)", fontsize=12)
+    ax.set_title(
+        "Timing Comparison: Thomas vs B-cyclic", fontsize=14, fontweight="bold"
+    )
+    ax.legend(loc="upper left", framealpha=0.9, ncol=1)
+    ax.grid(True, which="both", ls=":", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig("timing.png", dpi=150)
+    plt.close()
+    print("Saved plot as timing.png")
+
+
+if __name__ == "__main__":
+    main()

@@ -39,6 +39,8 @@ def time_function(fn, *args, n_runs=3):
 
 
 def main():
+    import matplotlib.pyplot as plt
+
     parser = argparse.ArgumentParser(
         description="Timing comparison of block tri-diagonal solvers"
     )
@@ -59,6 +61,7 @@ def main():
     n_blocks = args.n_blocks
     block_size = args.block_size
 
+    print(f"=" * 50)
     print(f"Block tri-diagonal solver timing comparison")
     print(f"=" * 50)
     print(f"Number of blocks: {n_blocks}")
@@ -97,12 +100,16 @@ def main():
     # Summary without vanilla
     print("\n" + "=" * 50)
     print("Timing summary:")
-    print(f"  Thomas:   {thomas_time:.4f} s")
-    print(f"  B-cyclic: {bcyclic_time:.4f} s")
+    print(f"  num blocks: {n_blocks}")
+    print(f"  block size: {block_size}")
+    print(f"  Thomas:     {thomas_time:.4f} s")
+    print(f"  B-cyclic:   {bcyclic_time:.4f} s")
     if bcyclic_time < thomas_time:
         print(f"  B-cyclic is {thomas_time / bcyclic_time:.2f}x faster than Thomas")
     else:
         print(f"  Thomas is {bcyclic_time / thomas_time:.2f}x faster than B-cyclic")
+    print()
+    print()
 
 
 if __name__ == "__main__":
