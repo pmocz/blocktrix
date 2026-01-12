@@ -4,6 +4,8 @@ A JAX library for efficiently solving block tri-diagonal matrix systems
 
 Author: [Philip Mocz (@pmocz)](https://github.com/pmocz/)
 
+Implements both a block **Thomas** (serial) solver and a block cyclic reduction **B-cyclic** (parallel) solver.
+
 ⚠️ **Warning: Work in Progress**
 
 This library is still under active development and is not guaranteed to work at this point XXX.
@@ -38,6 +40,8 @@ x = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
 ## It's fast!
 
 ![Timing comparison](examples/timing/timing.png)
+
+![Speedup](examples/timing/speedup.png)
 
 
 ## Links
