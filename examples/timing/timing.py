@@ -1,23 +1,108 @@
+#!/usr/bin/env python
+
+import argparse
+import time
+import jax
 import jax.numpy as jnp
-import blocktrix as btx
 
-# switch on for double precision
-# jax.config.update("jax_enable_x64", True)
+from blocktrix import (
+    solve_block_tridiagonal_thomas,
+    solve_block_tridiagonal_bcyclic,
+    random_block_tridiagonal,
+)
 
 """
-Timing blocktrix block tri-diagonal matrix solves
+Timing comparison of block tri-diagonal solvers.
 
-Philip Mocz (2026)
-
-Usage:
-  python timing.py
+Compares:
+- Thomas algorithm (serial)
+- B-cyclic algorithm (parallel-friendly)
+- Vanilla dense solve (build full matrix + jnp.linalg.solve)
 """
+
+
+def time_function(fn, *args, n_runs=3):
+    """Time a function, returning the minimum time across runs."""
+    # Warmup (JIT compile)
+    result = fn(*args)
+    result.block_until_ready()
+
+    times = []
+    for _ in range(n_runs):
+        start = time.perf_counter()
+        result = fn(*args)
+        result.block_until_ready()
+        end = time.perf_counter()
+        times.append(end - start)
+
+    return min(times), result
 
 
 def main():
-    # XXX
+    parser = argparse.ArgumentParser(
+        description="Timing comparison of block tri-diagonal solvers"
+    )
+    parser.add_argument(
+        "--n-blocks", type=int, default=1024, help="Number of blocks (default: 1024)"
+    )
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        default=256,
+        help="Size of each block (default: 256)",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=42, help="Random seed (default: 42)"
+    )
+    args = parser.parse_args()
 
-    return
+    n_blocks = args.n_blocks
+    block_size = args.block_size
+
+    print(f"Block tri-diagonal solver timing comparison")
+    print(f"=" * 50)
+    print(f"Number of blocks: {n_blocks}")
+    print(f"Block size: {block_size} x {block_size}")
+    print(f"Total matrix size: {n_blocks * block_size} x {n_blocks * block_size}")
+    print(f"=" * 50)
+    print()
+
+    # Generate random system
+    print("Generating random block tri-diagonal system...")
+    key = jax.random.PRNGKey(args.seed)
+    lower, diag, upper, rhs = random_block_tridiagonal(key, n_blocks, block_size)
+
+    # Force materialization
+    jax.block_until_ready([lower, diag, upper, rhs])
+    print("Done.\n")
+
+    # Time Thomas solver
+    print("Timing Thomas algorithm...")
+    thomas_time, x_thomas = time_function(
+        lambda: solve_block_tridiagonal_thomas(n_blocks, lower, diag, upper, rhs)
+    )
+    print(f"  Thomas time: {thomas_time:.4f} s")
+
+    # Time B-cyclic solver
+    print("Timing B-cyclic algorithm...")
+    bcyclic_time, x_bcyclic = time_function(
+        lambda: solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
+    )
+    print(f"  B-cyclic time: {bcyclic_time:.4f} s")
+
+    # Check agreement between methods
+    error_bc_th = jnp.max(jnp.abs(x_thomas - x_bcyclic))
+    print(f"\n  Max error (Thomas vs B-cyclic): {error_bc_th:.2e}")
+
+    # Summary without vanilla
+    print("\n" + "=" * 50)
+    print("Timing summary:")
+    print(f"  Thomas:   {thomas_time:.4f} s")
+    print(f"  B-cyclic: {bcyclic_time:.4f} s")
+    if bcyclic_time < thomas_time:
+        print(f"  B-cyclic is {thomas_time / bcyclic_time:.2f}x faster than Thomas")
+    else:
+        print(f"  Thomas is {bcyclic_time / thomas_time:.2f}x faster than B-cyclic")
 
 
 if __name__ == "__main__":
