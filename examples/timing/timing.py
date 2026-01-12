@@ -39,7 +39,6 @@ def time_function(fn, *args, n_runs=3):
 
 
 def main():
-
     parser = argparse.ArgumentParser(
         description="Timing comparison of block tri-diagonal solvers"
     )
