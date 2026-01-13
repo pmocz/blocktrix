@@ -70,8 +70,8 @@ def main():
         print("No slurm-cpu output files found.")
         return
 
-    gpu_file = max(slurm_gpu_files, key=os.path.getsize)
-    cpu_file = max(slurm_cpu_files, key=os.path.getsize)
+    gpu_file = max(slurm_gpu_files)
+    cpu_file = max(slurm_cpu_files)
     print(f"Reading timing results from {gpu_file} and {cpu_file}")
 
     (
@@ -144,6 +144,8 @@ def main():
     ax.set_yscale("log", base=10)
     ax.set_xticks([256, 512, 1024, 2048])
     ax.set_xticklabels([256, 512, 1024, 2048])
+    ax.tick_params(axis="both", which="both", direction="in", length=6)
+    ax.yaxis.set_ticks_position("both")
     ax.set_ylim(1e-3, 1e3)
     ax.set_xlabel("number of blocks", fontsize=12)
     ax.set_ylabel("time (s)", fontsize=12)
@@ -185,6 +187,8 @@ def main():
     ax.set_xscale("log", base=2)
     ax.set_xticks([256, 512, 1024, 2048])
     ax.set_xticklabels([256, 512, 1024, 2048])
+    ax.tick_params(axis="both", which="both", direction="in", length=6)
+    ax.yaxis.set_ticks_position("both")
     ax.set_ylim(0, 120)
     ax.set_xlabel("number of blocks", fontsize=12)
     ax.set_ylabel("speedup", fontsize=12)
