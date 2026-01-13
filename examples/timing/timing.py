@@ -16,8 +16,7 @@ Timing comparison of block tri-diagonal solvers.
 
 Compares:
 - Thomas algorithm (serial)
-- B-cyclic algorithm (parallel-friendly)
-- Vanilla dense solve (build full matrix + jnp.linalg.solve)
+- B-cyclic algorithm (parallel)
 """
 
 
@@ -39,8 +38,6 @@ def time_function(fn, *args, n_runs=3):
 
 
 def main():
-    import matplotlib.pyplot as plt
-
     parser = argparse.ArgumentParser(
         description="Timing comparison of block tri-diagonal solvers"
     )
@@ -61,13 +58,13 @@ def main():
     n_blocks = args.n_blocks
     block_size = args.block_size
 
-    print(f"=" * 50)
-    print(f"Block tri-diagonal solver timing comparison")
-    print(f"=" * 50)
+    print("=" * 50)
+    print("Block tri-diagonal solver timing comparison")
+    print("=" * 50)
     print(f"Number of blocks: {n_blocks}")
     print(f"Block size: {block_size} x {block_size}")
     print(f"Total matrix size: {n_blocks * block_size} x {n_blocks * block_size}")
-    print(f"-" * 50)
+    print("-" * 50)
     print()
 
     # Generate random system
@@ -109,7 +106,7 @@ def main():
         print(f"  B-cyclic is {thomas_time / bcyclic_time:.2f}x faster than Thomas")
     else:
         print(f"  Thomas is {bcyclic_time / thomas_time:.2f}x faster than B-cyclic")
-    print(f"=" * 50)
+    print("=" * 50)
     print()
     print()
 

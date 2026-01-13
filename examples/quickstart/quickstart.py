@@ -30,7 +30,7 @@ def main():
         key, n_blocks, block_size, diag_dominant=False
     )
 
-    print(f"Solving block tri-diagonal system:")
+    print("Solving block tri-diagonal system:")
     print(f"  n_blocks: {n_blocks}")
     print(f"  block_size: {block_size}")
     print(f"  Total system size: {n_blocks * block_size} x {n_blocks * block_size}")
