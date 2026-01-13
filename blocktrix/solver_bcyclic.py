@@ -134,7 +134,7 @@ def _recover_level(
 
 
 @partial(jax.jit, static_argnums=(0,))
-def solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs):
+def _solve_block_tridiagonal_bcyclic_pow2(n_blocks, lower, diag, upper, rhs):
     """
     Solve a block tri-diagonal system using the B-cyclic reduction algorithm.
 
@@ -235,3 +235,72 @@ def solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs):
         x = x[..., 0]
 
     return x
+
+
+@partial(jax.jit, static_argnums=(0,))
+def solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs):
+    """
+    Solve a block tri-diagonal system using the B-cyclic reduction algorithm.
+
+    This function handles any number of blocks by padding to the next power of 2
+    when necessary.
+
+    Parameters
+    ----------
+    n_blocks : int
+        Number of diagonal blocks (any positive integer).
+    lower : jnp.ndarray, shape (n_blocks-1, m, m)
+        Sub-diagonal blocks A_1, A_2, ..., A_{n-1}.
+    diag : jnp.ndarray, shape (n_blocks, m, m)
+        Diagonal blocks B_0, B_1, ..., B_{n-1}.
+    upper : jnp.ndarray, shape (n_blocks-1, m, m)
+        Super-diagonal blocks C_0, C_1, ..., C_{n-2}.
+    rhs : jnp.ndarray, shape (n_blocks, m) or (n_blocks, m, k)
+        Right-hand side vector(s).
+
+    Returns
+    -------
+    x : jnp.ndarray, shape (n_blocks, m) or (n_blocks, m, k)
+        Solution vector(s).
+
+    Notes
+    -----
+    For n_blocks that are not a power of 2, the system is padded with identity
+    diagonal blocks and zero off-diagonal blocks. The padded system is solved
+    using the B-cyclic algorithm, and the solution is extracted for the
+    original blocks.
+    """
+    if n_blocks < 1:
+        raise ValueError(f"n_blocks must be positive, got {n_blocks}")
+
+    # Check if n_blocks is a power of 2
+    is_power_of_2 = (n_blocks & (n_blocks - 1)) == 0
+
+    if is_power_of_2:
+        return _solve_block_tridiagonal_bcyclic_pow2(n_blocks, lower, diag, upper, rhs)
+
+    # Pad to next power of 2
+    n_padded = 1 << (n_blocks - 1).bit_length()
+    n_pad = n_padded - n_blocks
+    m = diag.shape[1]
+
+    # Pad diagonal with identity blocks
+    I_blocks = jnp.tile(jnp.eye(m)[None, ...], (n_pad, 1, 1))
+    diag_padded = jnp.concatenate([diag, I_blocks], axis=0)
+
+    # Pad off-diagonals with zero blocks
+    zero_blocks = jnp.zeros((n_pad, m, m))
+    lower_padded = jnp.concatenate([lower, zero_blocks], axis=0)
+    upper_padded = jnp.concatenate([upper, zero_blocks], axis=0)
+
+    # Pad RHS with zeros
+    rhs_pad_shape = (n_pad,) + rhs.shape[1:]
+    rhs_padded = jnp.concatenate([rhs, jnp.zeros(rhs_pad_shape)], axis=0)
+
+    # Solve padded system
+    x_padded = _solve_block_tridiagonal_bcyclic_pow2(
+        n_padded, lower_padded, diag_padded, upper_padded, rhs_padded
+    )
+
+    # Extract original solution
+    return x_padded[:n_blocks]

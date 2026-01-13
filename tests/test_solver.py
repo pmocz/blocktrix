@@ -240,6 +240,65 @@ class TestSolveBlockTridiagonalBcyclic:
             residual = jnp.linalg.norm(M @ x.flatten() - rhs.flatten())
             assert residual < 1e-4, f"Failed for n_blocks={n_blocks}"
 
+    def test_non_power_of_two_sizes(self):
+        """Test non-power-of-2 system sizes (uses padding)."""
+        key = jax.random.PRNGKey(444)
+        block_size = 2
+
+        for n_blocks in [3, 5, 6, 7, 9, 10, 15, 17, 31, 33]:
+            lower, diag, upper, rhs = random_block_tridiagonal(
+                key, n_blocks, block_size, diag_dominant=True
+            )
+
+            x = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
+
+            M = build_block_tridiagonal_matrix(lower, diag, upper)
+            relative_error = jnp.linalg.norm(
+                M @ x.flatten() - rhs.flatten()
+            ) / jnp.linalg.norm(rhs.flatten())
+            assert relative_error < 1e-4, f"Failed for n_blocks={n_blocks}"
+
+    def test_non_power_of_two_compare_to_thomas(self):
+        """Compare B-cyclic with padding to Thomas solver for non-power-of-2."""
+        key = jax.random.PRNGKey(555)
+        n_blocks, block_size = 11, 3
+
+        lower, diag, upper, rhs = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        x_bcyclic = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
+        x_thomas = solve_block_tridiagonal_thomas(n_blocks, lower, diag, upper, rhs)
+
+        assert jnp.allclose(x_bcyclic, x_thomas, rtol=1e-5)
+
+    def test_non_power_of_two_multiple_rhs(self):
+        """Test non-power-of-2 with multiple right-hand sides."""
+        key = jax.random.PRNGKey(666)
+        n_blocks, block_size = 7, 3
+        n_rhs = 4
+
+        lower, diag, upper, _ = random_block_tridiagonal(
+            key, n_blocks, block_size, diag_dominant=True
+        )
+
+        key2 = jax.random.PRNGKey(777)
+        rhs_multi = jax.random.normal(key2, (n_blocks, block_size, n_rhs))
+
+        x_multi = solve_block_tridiagonal_bcyclic(
+            n_blocks, lower, diag, upper, rhs_multi
+        )
+
+        assert x_multi.shape == (n_blocks, block_size, n_rhs)
+
+        # Verify each RHS solution
+        M = build_block_tridiagonal_matrix(lower, diag, upper)
+        for k in range(n_rhs):
+            x_k = x_multi[..., k].flatten()
+            rhs_k = rhs_multi[..., k].flatten()
+            residual = jnp.linalg.norm(M @ x_k - rhs_k)
+            assert residual < 1e-5
+
 
 class TestBuildBlockTridiagonalMatrix:
     """Tests for building the full matrix."""
