@@ -60,21 +60,36 @@ def read_timing_results(filename):
 
 
 def main():
-    # Find the largest slurm*.out file
-    slurm_files = glob.glob("slurm-*.out")
-    if not slurm_files:
-        print("No slurm output files found.")
+    # Find the largest slurm-gpu*.out file
+    slurm_gpu_files = glob.glob("slurm-gpu*.out")
+    if not slurm_gpu_files:
+        print("No slurm-gpu output files found.")
+        return
+    slurm_cpu_files = glob.glob("slurm-cpu*.out")
+    if not slurm_cpu_files:
+        print("No slurm-cpu output files found.")
         return
 
-    largest_file = max(slurm_files, key=os.path.getsize)
-    print(f"Reading timing results from {largest_file}")
+    gpu_file = max(slurm_gpu_files, key=os.path.getsize)
+    cpu_file = max(slurm_cpu_files, key=os.path.getsize)
+    print(f"Reading timing results from {gpu_file} and {cpu_file}")
 
     (
         n_blocks,
         block_sizes,
         thomas_times,
         bcyclic_times,
-    ) = read_timing_results(largest_file)
+    ) = read_timing_results(gpu_file)
+
+    (
+        n_blocks_cpu,
+        block_sizes_cpu,
+        thomas_times_cpu,
+        bcyclic_times_cpu,
+    ) = read_timing_results(cpu_file)
+
+    assert (n_blocks == n_blocks_cpu).all()
+    assert (block_sizes == block_sizes_cpu).all()
 
     # unique_n_blocks = np.unique(n_blocks)
     unique_block_sizes = np.unique(block_sizes)[::-1]  # Reverse to plot largest first
@@ -87,7 +102,20 @@ def main():
 
     for i, bs in enumerate(unique_block_sizes):
         mask = block_sizes == bs
-        # Dashed line + filled marker for Thomas
+        # Thomas (cpu)
+        ax.plot(
+            n_blocks[mask],
+            thomas_times_cpu[mask],
+            marker="o",
+            linestyle=":",
+            color=colors[i],
+            linewidth=1,
+            markersize=6,
+            markeredgewidth=1,
+            markerfacecolor="none",
+            label=f"Thomas - CPU (block-size={bs})",
+        )
+        # Thomas (gpu)
         ax.plot(
             n_blocks[mask],
             thomas_times[mask],
@@ -96,10 +124,11 @@ def main():
             color=colors[i],
             linewidth=2,
             markersize=6,
+            markeredgewidth=2,
             markerfacecolor="none",
-            label=f"Thomas (bs={bs})",
+            label=f"Thomas - GPU (block-size={bs})",
         )
-        # Solid line + empty marker for B-cyclic
+        # B-cyclic (gpu)
         ax.plot(
             n_blocks[mask],
             bcyclic_times[mask],
@@ -108,50 +137,63 @@ def main():
             color=colors[i],
             linewidth=2,
             markersize=6,
-            label=f"B-cyclic (bs={bs})",
+            label=f"B-cyclic - GPU (block-size={bs})",
         )
 
     ax.set_xscale("log", base=2)
     ax.set_yscale("log", base=10)
     ax.set_xticks([256, 512, 1024, 2048])
     ax.set_xticklabels([256, 512, 1024, 2048])
-    ax.set_ylim(1e-3, 1e1)
+    ax.set_ylim(1e-3, 1e3)
     ax.set_xlabel("number of blocks", fontsize=12)
     ax.set_ylabel("time (s)", fontsize=12)
-    ax.set_title(
-        "Timing Comparison: Thomas vs B-cyclic", fontsize=14, fontweight="bold"
-    )
-    ax.legend(loc="upper left", framealpha=0.9, ncol=1)
-    ax.grid(True, which="both", ls=":", alpha=0.5)
+    ax.set_title("Timing Comparison", fontsize=14, fontweight="bold")
+    ax.legend(loc="upper left", framealpha=0.9, ncol=2)
     plt.tight_layout()
     plt.savefig("timing.png", dpi=150)
     plt.close()
     print("Saved plot as timing.png")
 
-    # Plot Speedup
+    # Plot Speedup (B-cyclic GPU vs Thomas GPU and CPU)
     fig, ax = plt.subplots(figsize=(10, 6))
     for i, bs in enumerate(unique_block_sizes):
         mask = block_sizes == bs
-        speedup = thomas_times[mask] / bcyclic_times[mask]
+        speedup_gpu = thomas_times[mask] / bcyclic_times[mask]
+        speedup_cpu = thomas_times_cpu[mask] / bcyclic_times[mask]
         ax.plot(
             n_blocks[mask],
-            speedup,
-            marker="o",
+            speedup_gpu,
+            marker="s",
             linestyle="-",
             color=colors[i],
             linewidth=2,
             markersize=6,
-            label=f"bs={bs}",
+            label=f"vs Thomas GPU (block-size={bs})",
+        )
+        ax.plot(
+            n_blocks[mask],
+            speedup_cpu,
+            marker="o",
+            linestyle="--",
+            color=colors[i],
+            linewidth=1,
+            markersize=6,
+            markeredgewidth=1,
+            markerfacecolor="none",
+            label=f"vs Thomas CPU (block-size={bs})",
         )
     ax.set_xscale("log", base=2)
     ax.set_xticks([256, 512, 1024, 2048])
     ax.set_xticklabels([256, 512, 1024, 2048])
-    ax.set_ylim(1, 120)
+    ax.set_ylim(0, 120)
     ax.set_xlabel("number of blocks", fontsize=12)
     ax.set_ylabel("speedup", fontsize=12)
-    ax.set_title("Speedup of B-cyclic over Thomas", fontsize=14, fontweight="bold")
-    ax.legend(loc="upper left", framealpha=0.9, ncol=1)
-    ax.grid(True, which="both", ls=":", alpha=0.5)
+    ax.set_title(
+        "Speedup of B-cyclic (GPU) over Thomas (GPU,CPU)",
+        fontsize=14,
+        fontweight="bold",
+    )
+    ax.legend(loc="upper left", framealpha=0.9, ncol=2)
     plt.tight_layout()
     plt.savefig("speedup.png", dpi=150)
     plt.close()

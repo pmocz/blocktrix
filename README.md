@@ -39,6 +39,7 @@ x = solve_block_tridiagonal_bcyclic(n_blocks, lower, diag, upper, rhs)
 
 ![Timing comparison](examples/timing/timing.png)
 
+![Speedup](examples/timing/speedup.png)
 
 ## Links
 
