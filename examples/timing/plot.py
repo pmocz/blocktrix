@@ -186,9 +186,12 @@ def main():
     ax.set_xscale("log", base=2)
     ax.set_xticks([256, 512, 1024, 2048])
     ax.set_xticklabels([256, 512, 1024, 2048])
+    ax.set_yscale("log", base=2)
+    ax.set_yticks([2, 4, 8, 16, 32, 64, 128], minor=True)
+    ax.set_yticklabels([2, 4, 8, 16, 32, 64, 128])
     ax.tick_params(axis="both", which="both", direction="in", length=6)
     ax.yaxis.set_ticks_position("both")
-    ax.set_ylim(0, 120)
+    ax.set_ylim(4, 128)
     ax.set_xlabel("number of blocks", fontsize=12)
     ax.set_ylabel("speedup", fontsize=12)
     ax.set_title(
