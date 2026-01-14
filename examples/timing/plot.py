@@ -58,6 +58,69 @@ def read_timing_results(filename):
     )
 
 
+def read_mesa_timing():
+    """
+    read mesa-timing.txt file for comparison
+    """
+
+    mesa_n_blocks = []
+    mesa_block_sizes = []
+    mesa_times = []
+
+    with open("mesa-timing.txt", "r") as f:
+        lines = f.readlines()
+
+    # Skip header lines and find data
+    for line in lines:
+        line = line.strip()
+        # Skip empty lines and headers
+        if (
+            not line
+            or "=" in line
+            or "nvar" in line
+            or "Star" in line
+            or "Testing" in line
+            or "Number" in line
+            or "for various" in line
+            or "---" in line
+        ):
+            continue
+
+        # Parse data lines
+        parts = line.split()
+        if len(parts) >= 4:
+            try:
+                block_size = int(parts[0])
+                n_blocks = int(parts[1])
+                factor_time = float(parts[2])
+                solve_time = float(parts[3])
+                total_time = factor_time + solve_time
+
+                mesa_block_sizes.append(block_size)
+                mesa_n_blocks.append(n_blocks)
+                mesa_times.append(total_time)
+            except ValueError:
+                # Skip lines that can't be parsed
+                continue
+
+    # Convert to numpy arrays
+    mesa_n_blocks = np.array(mesa_n_blocks)
+    mesa_block_sizes = np.array(mesa_block_sizes)
+    mesa_times = np.array(mesa_times)
+
+    # Sort by n_blocks first, then by block_sizes
+    sort_indices = np.lexsort((mesa_block_sizes, mesa_n_blocks))
+    mesa_n_blocks = mesa_n_blocks[sort_indices]
+    mesa_block_sizes = mesa_block_sizes[sort_indices]
+    mesa_times = mesa_times[sort_indices]
+
+    return (
+        mesa_n_blocks,
+        mesa_block_sizes,
+        mesa_times,
+    )
+
+
 def main():
     # Find the largest slurm-gpu*.out file
     slurm_gpu_files = glob.glob("slurm-gpu*.out")
@@ -90,40 +153,64 @@ def main():
     assert (n_blocks == n_blocks_cpu).all()
     assert (block_sizes == block_sizes_cpu).all()
 
+    # Read MESA bcyclic timing results
+    (
+        mesa_n_blocks,
+        mesa_block_sizes,
+        mesa_times,
+    ) = read_mesa_timing()
+
+    assert (n_blocks == mesa_n_blocks).all()
+    assert (block_sizes == mesa_block_sizes).all()
+
     # unique_n_blocks = np.unique(n_blocks)
     unique_block_sizes = np.unique(block_sizes)[::-1]  # Reverse to plot largest first
 
     # Plot Timing
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(10, 8))
 
     # Use colormap for different block sizes
     colors = plt.cm.tab10(np.arange(len(unique_block_sizes)))
 
     for i, bs in enumerate(unique_block_sizes):
         mask = block_sizes == bs
-        # Thomas (cpu)
+        # MESA (cpu)
         ax.plot(
             n_blocks[mask],
-            thomas_times_cpu[mask],
+            mesa_times[mask],
+            marker="s",
+            linestyle="--",
+            color=colors[i],
+            linewidth=3,
+            markersize=6,
+            markeredgewidth=2,
+            markerfacecolor="none",
+            label=f"MESA B-cyclic - CPU (block-size={bs})",
+        )
+        # Thomas (cpu)
+        if False:
+            ax.plot(
+                n_blocks[mask],
+                thomas_times_cpu[mask],
+                marker="o",
+                linestyle=":",
+                color=colors[i],
+                linewidth=1,
+                markersize=6,
+                markeredgewidth=1,
+                markerfacecolor="none",
+                label=f"Thomas - CPU (block-size={bs})",
+            )
+        # Thomas (gpu)
+        ax.plot(
+            n_blocks[mask],
+            thomas_times[mask],
             marker="o",
             linestyle=":",
             color=colors[i],
             linewidth=1,
             markersize=6,
             markeredgewidth=1,
-            markerfacecolor="none",
-            label=f"Thomas - CPU (block-size={bs})",
-        )
-        # Thomas (gpu)
-        ax.plot(
-            n_blocks[mask],
-            thomas_times[mask],
-            marker="o",
-            linestyle="--",
-            color=colors[i],
-            linewidth=2,
-            markersize=6,
-            markeredgewidth=2,
             markerfacecolor="none",
             label=f"Thomas - GPU (block-size={bs})",
         )
@@ -134,7 +221,7 @@ def main():
             marker="s",
             linestyle="-",
             color=colors[i],
-            linewidth=2,
+            linewidth=3,
             markersize=6,
             label=f"B-cyclic - GPU (block-size={bs})",
         )
@@ -156,50 +243,63 @@ def main():
     print("Saved plot as timing.png")
 
     # Plot Speedup (B-cyclic GPU vs Thomas GPU and CPU)
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(10, 8))
     for i, bs in enumerate(unique_block_sizes):
         mask = block_sizes == bs
         speedup_gpu = thomas_times[mask] / bcyclic_times[mask]
         speedup_cpu = thomas_times_cpu[mask] / bcyclic_times[mask]
         ax.plot(
-            n_blocks[mask],
-            speedup_gpu,
+            mesa_n_blocks[mask],
+            mesa_times[mask] / bcyclic_times[mask],
             marker="s",
             linestyle="-",
             color=colors[i],
-            linewidth=2,
+            linewidth=3,
             markersize=6,
-            label=f"vs Thomas GPU (block-size={bs})",
+            markeredgewidth=2,
+            label=f"vs MESA CPU (block-size={bs})",
         )
         ax.plot(
             n_blocks[mask],
-            speedup_cpu,
+            speedup_gpu,
             marker="o",
-            linestyle="--",
+            linestyle=":",
             color=colors[i],
             linewidth=1,
             markersize=6,
-            markeredgewidth=1,
             markerfacecolor="none",
-            label=f"vs Thomas CPU (block-size={bs})",
+            label=f"vs Thomas GPU (block-size={bs})",
         )
+        if False:
+            ax.plot(
+                n_blocks[mask],
+                speedup_cpu,
+                marker="o",
+                linestyle="--",
+                color=colors[i],
+                linewidth=1,
+                markersize=6,
+                markeredgewidth=1,
+                markerfacecolor="none",
+                label=f"vs Thomas CPU (block-size={bs})",
+            )
     ax.set_xscale("log", base=2)
     ax.set_xticks([256, 512, 1024, 2048])
     ax.set_xticklabels([256, 512, 1024, 2048])
-    ax.set_yscale("log", base=2)
-    ax.set_yticks([2, 4, 8, 16, 32, 64, 128], minor=True)
-    ax.set_yticklabels([2, 4, 8, 16, 32, 64, 128])
+    ax.set_yscale("log", base=10)
+    ax.set_yticks([1, 10, 100, 1000])
+    ax.set_yticklabels([1, 10, 100, 1000])
     ax.tick_params(axis="both", which="both", direction="in", length=6)
     ax.yaxis.set_ticks_position("both")
-    ax.set_ylim(4, 128)
+    ax.set_ylim(1, 1000)
     ax.set_xlabel("number of blocks", fontsize=12)
     ax.set_ylabel("speedup", fontsize=12)
     ax.set_title(
-        "Speedup of B-cyclic (GPU) over Thomas (GPU,CPU)",
+        "Speedup of B-cyclic (GPU) over Thomas (GPU), MESA(CPU)",
         fontsize=14,
         fontweight="bold",
     )
-    ax.legend(loc="upper left", framealpha=0.9, ncol=2)
+    ax.legend(loc="lower right", framealpha=0.9, ncol=2)
     plt.tight_layout()
     plt.savefig("speedup.png", dpi=150)
     plt.close()
